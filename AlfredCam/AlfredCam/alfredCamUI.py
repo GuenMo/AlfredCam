@@ -1,25 +1,33 @@
 # coding:utf-8
 
 import os
-from PySide import QtGui, QtCore
-from shiboken import wrapInstance
+
+try:
+    import PySide
+    from PySide.QtGui import *
+    from PySide.QtCore import *
+    from shiboken import wrapInstance
+except:
+    import PySide2
+    from PySide2.QtGui import *
+    from PySide2.QtCore import *
+    from PySide2.QtWidgets import *
+    from shiboken2 import wrapInstance
+
 
 import pymel.all as pm
 from functools import partial
 from logo import Logo
 import maya.OpenMayaUI as OpenMayaUI
-import stylesheet
 
 import alfredCam as Camera
 reload(Camera)
-import resources
-reload(resources)
 
 __version__ = '1.1.0'
 
 def getMayaWindow():
     ptr = OpenMayaUI.MQtUtil.mainWindow()
-    return wrapInstance(long(ptr), QtGui.QMainWindow)
+    return wrapInstance(long(ptr), QMainWindow)
 
 def mayaToQtObject( inMayaUI ):
     ptr = OpenMayaUI.MQtUtil.findControl( inMayaUI )
@@ -28,9 +36,9 @@ def mayaToQtObject( inMayaUI ):
     if ptr is None:
         ptr= OpenMayaUI.MQtUtil.findMenuItem( inMayaUI )
     if ptr is not None:
-        return wrapInstance( long( ptr ), QtGui.QWidget )
+        return wrapInstance( long( ptr ), QWidget )
 
-class MainWindow(QtGui.QMainWindow):
+class MainWindow(QMainWindow):
     
     def __init__(self, parent=getMayaWindow()):
         super(MainWindow, self).__init__(parent)
@@ -51,39 +59,39 @@ class MainWindow(QtGui.QMainWindow):
         self.mayaWiget = pm.text()
         self.mayaText = mayaToQtObject(self.mayaWiget)
         self.setWindowTitle('Alfred Camera Tool')
-        self.centralWidget = QtGui.QWidget()
+        self.centralWidget = QWidget()
         self.setCentralWidget(self.centralWidget)
-        self.mainLayoyt = QtGui.QVBoxLayout()
+        self.mainLayoyt = QVBoxLayout()
         self.centralWidget.setLayout(self.mainLayoyt)
         
         # Create Camera UI
-        self.creationGroup  = QtGui.QGroupBox('Create')
-        self.creationLayout = QtGui.QGridLayout()
+        self.creationGroup  = QGroupBox('Create')
+        self.creationLayout = QGridLayout()
         self.creationGroup.setLayout(self.creationLayout)
         
-        cameraNameLabel = QtGui.QLabel('Camera Name:')
-        cameraNameLabel.setAlignment(QtCore.Qt.AlignRight)
-        self.cameraLineEdit = QtGui.QLineEdit()
-        self.createCameraPushBtn = QtGui.QPushButton('Create Camera')
+        cameraNameLabel = QLabel('Camera Name:')
+        cameraNameLabel.setAlignment(Qt.AlignRight)
+        self.cameraLineEdit = QLineEdit()
+        self.createCameraPushBtn = QPushButton('Create Camera')
         
         self.creationLayout.addWidget(cameraNameLabel,         0,0)
         self.creationLayout.addWidget(self.cameraLineEdit,     0,1)
         self.creationLayout.addWidget(self.createCameraPushBtn,1,1)
         
         # Edit Camera UI
-        self.editGroup  = QtGui.QGroupBox('Edit')
-        self.editLayout = QtGui.QGridLayout()
+        self.editGroup  = QGroupBox('Edit')
+        self.editLayout = QGridLayout()
         self.editGroup.setLayout(self.editLayout)
         
-        renameLabel         = QtGui.QLabel('Camera Rename:')
-        self.renameLineEdit = QtGui.QLineEdit()
-        self.renameButton   = QtGui.QPushButton('Rename')
-        matchFilmLabel      = QtGui.QLabel('Match Filmback \nto Resolution:')
+        renameLabel         = QLabel('Camera Rename:')
+        self.renameLineEdit = QLineEdit()
+        self.renameButton   = QPushButton('Rename')
+        matchFilmLabel      = QLabel('Match Filmback \nto Resolution:')
         matchFilmLabel.setWordWrap(True)
-        self.matchButton    = QtGui.QPushButton('Match')
-        setRangeLabel       = QtGui.QLabel('Set Playback \nRange of Camera:')
+        self.matchButton    = QPushButton('Match')
+        setRangeLabel       = QLabel('Set Playback \nRange of Camera:')
         setRangeLabel.setWordWrap(True)
-        self.setRangeButton = QtGui.QPushButton('Set Range')
+        self.setRangeButton = QPushButton('Set Range')
         
         self.editLayout.addWidget(renameLabel,         0,0)
         self.editLayout.addWidget(self.renameLineEdit, 0,1)
@@ -94,11 +102,11 @@ class MainWindow(QtGui.QMainWindow):
         self.editLayout.addWidget(self.setRangeButton, 4,1)
         
         # Operation
-        self.operationGroup  = QtGui.QGroupBox('Operation')
-        operationLayout = QtGui.QHBoxLayout()
-        self.renderableButton = QtGui.QPushButton('Renderable')
-        self.bakeButton = QtGui.QPushButton('Bake')
-        self.deleteButton = QtGui.QPushButton('Delete')
+        self.operationGroup  = QGroupBox('Operation')
+        operationLayout = QHBoxLayout()
+        self.renderableButton = QPushButton('Renderable')
+        self.bakeButton = QPushButton('Bake')
+        self.deleteButton = QPushButton('Delete')
         operationLayout.addWidget(self.renderableButton)
         operationLayout.addWidget(self.bakeButton)
         operationLayout.addWidget(self.deleteButton)
@@ -117,11 +125,10 @@ class MainWindow(QtGui.QMainWindow):
         self.setDefaultUI()
         
         #Set Window
-        windowLogoImage = QtGui.QPixmap(os.path.join(self.imagePath,'camera.png'))
-        windowLogoIcon  = QtGui.QIcon(windowLogoImage)
+        windowLogoImage = QPixmap(os.path.join(self.imagePath,'camera.png'))
+        windowLogoIcon  = QIcon(windowLogoImage)
         self.setWindowIcon(windowLogoIcon)
         self.setFixedWidth(300)
-        self.setStyleSheet(self.stylData)
         self.setObjectName('alfredCamUI')
         
     def connections(self):
@@ -247,12 +254,12 @@ class MainWindow(QtGui.QMainWindow):
         self.printStaus('bake')
         
     def deleteCamera(self):
-        reply = QtGui.QMessageBox.question(self, 
+        reply = QMessageBox.question(self, 
                                            'Delete Camera',
                                            u'선택된 카메라를 삭제 하시겠습니까?',
-                                           QtGui.QMessageBox.Yes | QtGui.QMessageBox.No)
+                                           QMessageBox.Yes | QMessageBox.No)
         
-        if reply == QtGui.QMessageBox.Yes:
+        if reply == QMessageBox.Yes:
             self.camera.delete()
             self.printStaus('delete')
         else:
