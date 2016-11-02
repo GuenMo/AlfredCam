@@ -23,7 +23,7 @@ import maya.OpenMayaUI as OpenMayaUI
 import alfredCam as Camera
 reload(Camera)
 
-__version__ = '1.1.0'
+__version__ = '1.3.0'
 
 def getMayaWindow():
     ptr = OpenMayaUI.MQtUtil.mainWindow()
@@ -47,7 +47,6 @@ class MainWindow(QMainWindow):
         
         self.rootPath  = MainWindow.getRootPath()
         self.imagePath = MainWindow.getImagePath()
-        self.stylData  = stylesheet.darkorange
 
         self.initUi()
         self.connections()
