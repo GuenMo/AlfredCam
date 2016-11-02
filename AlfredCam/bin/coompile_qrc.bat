@@ -1,0 +1,4 @@
+c:
+cd C:\Python27\Lib\site-packages\PySide
+pyside-rcc -o I:\GoogleDrive\1_MayaPy\01_RIG\AlfredCam\resources.py I:\GoogleDrive\1_MayaPy\01_RIG\AlfredCam\doc\resources.qrc
+pause

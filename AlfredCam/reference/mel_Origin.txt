@@ -1,0 +1,769 @@
+global proc string[] createCam() {
+    string $camera[] = `camera
+        -centerOfInterest 5
+        -focalLength 35
+        -lensSqueezeRatio 1
+        -cameraScale 1
+        -horizontalFilmAperture 1.77777
+        -verticalFilmAperture 1.0
+        -horizontalFilmOffset 0
+        -verticalFilmOffset 0
+        -filmFit Horizontal
+        -overscan 1
+        -motionBlur 0
+        -shutterAngle 144
+        -nearClipPlane 0.1
+        -farClipPlane 10000
+        -orthographic 0
+        -orthographicWidth 30
+        -panZoomEnabled 0
+        -horizontalPan 0
+        -verticalPan 0
+        -zoom 1`;
+
+    return $camera;
+}
+
+global proc string createCameraCtrler(string $camera) {
+    string $listRelatives[] = `listRelatives -s $camera`;
+    string $cameraShape = $listRelatives[0];
+
+    // 노드명
+    string $Ctrl = $camera+"_Ctrl";
+    string $constraint = $camera+"_constraint";
+    string $shakeTransform = $camera+"_Shake";
+    string $offset   = $camera+"_offset";
+    string $offsetTx = $camera+"_offsetTx";
+    string $offsetTy = $camera+"_offsetTy";
+    string $offsetTz = $camera+"_offsetTz";
+    string $tz = $camera+"_tz";
+    string $rz = $camera+"_rz";
+    string $rx = $camera+"_rx";
+    string $ry = $camera+"_ry";
+
+    // 그룹 리깅
+        group -n $constraint -em;
+        group -n $offset;
+        group -n $shakeTransform;
+        group -n $offsetTz;
+        group -n $offsetTy;
+        group -n $offsetTx;
+        group -n $tz;
+        group -n $rz;
+        group -n $rx;
+        group -n $ry;
+        group -n $Ctrl;
+
+        setAttr ($Ctrl+".displayHandle") 1;
+        setAttr ($Ctrl+".overrideEnabled") 1;
+        setAttr ($Ctrl+".overrideColor") 7;  //dark_green
+
+    // Display
+        string $dispGrp = `group -n ($camera+"_Template_Grp") -em`;
+        parent $dispGrp $Ctrl;
+
+        setAttr ($dispGrp+".overrideEnabled") 1;
+        setAttr ($dispGrp+".overrideDisplayType") 1;
+        setAttr ($dispGrp+".overrideColor") 7;  //dark_green
+
+        string $dispCrvs[] = stringArrayCatenate( $dispCrvs, KH_curve_DisplayConnect({$Ctrl,$tz})             );
+        string $dispCrvs[] = stringArrayCatenate( $dispCrvs, KH_curve_DisplayConnect({$tz,$offsetTx})         );
+        string $dispCrvs[] = stringArrayCatenate( $dispCrvs, KH_curve_DisplayConnect({$offsetTx,$offsetTy})   );
+        string $dispCrvs[] = stringArrayCatenate( $dispCrvs, KH_curve_DisplayConnect({$offsetTy,$offsetTz})   );
+
+        for ($i=0;$i<size($dispCrvs);$i++) {
+            $dispCrvs[$i] = `rename $dispCrvs[$i] ($camera+"_"+$dispCrvs[$i])`;
+        }
+
+        parent $dispCrvs $dispGrp;
+
+
+
+    // 컨틀롤러에 어트리뷰트 추가
+        addAttr -ln "Camera"       -nn "----- Camera" -at "enum" -en "----- : :"  $Ctrl; setAttr -e -channelBox true ($Ctrl+".Camera");
+            addAttr -ln "focalLength"           -nn "FocalLength (mm)"     -at double -dv 35 -keyable true $Ctrl;
+            //addAttr -ln "orthographic"          -nn "Orthographic"         -at "enum" -en "off:on:" -dv 0 -keyable 1 $Ctrl;
+            addAttr -ln "overscan"              -nn "Overscan"             -at double -dv 1  -keyable true $Ctrl;
+            addAttr -ln "frameRange"            -nn "Frame Range (frame)"  -at double2              $Ctrl;
+            addAttr -ln "startFrame"            -nn "Start Frame"          -at double -p frameRange $Ctrl;
+            addAttr -ln "endFrame"              -nn "End Frame"            -at double -p frameRange $Ctrl;
+
+        addAttr -ln "Tumble"     -nn "----- Tumble" -at "enum" -en "----- : :"  $Ctrl;
+            addAttr -ln "tumbleTranslateZ"   -nn "Tumble Translate Z" -at double                    $Ctrl;
+            addAttr -ln "tumbleRotate"       -nn "Tumble Rotate"      -at double3                   $Ctrl;
+            addAttr -ln "tumbleRotateX"      -nn "Tumble Rotate X"    -at double  -p tumbleRotate   $Ctrl;
+            addAttr -ln "tumbleRotateY"      -nn "Tumble Rotate Y"    -at double  -p tumbleRotate   $Ctrl;
+            addAttr -ln "tumbleRotateZ"      -nn "Tumble Rotate Z"    -at double  -p tumbleRotate   $Ctrl;
+
+        addAttr -ln "Shake"      -nn "----- Shake" -at "enum" -en "-----: :"  $Ctrl;
+            addAttr -ln "time"       -nn "Shake Time (초)"        -at double -keyable false $Ctrl;
+            addAttr -ln "timeOffset" -nn "Shake Time Offset (초)" -at double -keyable false $Ctrl;
+
+            addAttr -ln "shake1"          -nn "Shake 1st (진폭, 주기)" -at double2          $Ctrl;
+            addAttr -ln "shakeAmplitude1" -nn "Shake 1st (진폭)"       -at double -p shake1 $Ctrl;
+            addAttr -ln "shakeFrequency1" -nn "Frequency 1st (주기)"   -at double -p shake1 $Ctrl;
+
+            addAttr -ln "noise1"      -nn "Shake Noise 1st"   -at double3  $Ctrl;
+            addAttr -ln "noise1X"     -nn "Shake Noise 1 X"   -at double  -p noise1 $Ctrl;
+            addAttr -ln "noise1Y"     -nn "Shake Noise 1 Y"   -at double  -p noise1 $Ctrl;
+            addAttr -ln "noise1Z"     -nn "Shake Noise 1 Z"   -at double  -p noise1 $Ctrl;
+
+            addAttr -ln "shake2"            -nn "Shake 2nd (진폭, 주기)" -at double2           $Ctrl;
+            addAttr -ln "shakeAmplitude2"   -nn "Shake 2nd (진폭)"       -at double -p shake2  $Ctrl;
+            addAttr -ln "shakeFrequency2"   -nn "Frequency 2nd (주기)"   -at double -p shake2  $Ctrl;
+
+            addAttr -ln "noise2"      -nn "Shake Noise 2nd"   -at double3           $Ctrl;
+            addAttr -ln "noise2X"     -nn "Shake Noise 2 X"   -at double  -p noise2 $Ctrl;
+            addAttr -ln "noise2Y"     -nn "Shake Noise 2 Y"   -at double  -p noise2 $Ctrl;
+            addAttr -ln "noise2Z"     -nn "Shake Noise 2 Z"   -at double  -p noise2 $Ctrl;
+
+            addAttr -ln "shakeTranslate"   -nn "Shake Translate"    -at double3                      $Ctrl;
+            addAttr -ln "shakeTranslateX"  -nn "Shake Translate X"  -at double  -p shakeTranslate    $Ctrl;
+            addAttr -ln "shakeTranslateY"  -nn "Shake Translate Y"  -at double  -p shakeTranslate    $Ctrl;
+            addAttr -ln "shakeTranslateZ"  -nn "Shake Translate Z"  -at double  -p shakeTranslate    $Ctrl;
+
+            addAttr -ln "shakeRotate"      -nn "Shake Rotate"       -at double3                      $Ctrl;
+            addAttr -ln "shakeRotateX"     -nn "Shake Rotate X"     -at double  -p shakeRotate       $Ctrl;
+            addAttr -ln "shakeRotateY"     -nn "Shake Rotate Y"     -at double  -p shakeRotate       $Ctrl;
+            addAttr -ln "shakeRotateZ"     -nn "Shake Rotate Z"     -at double  -p shakeRotate       $Ctrl;
+
+        addAttr -ln "Offset"     -nn "----- Offset" -at "enum" -en "----- : :"  $Ctrl;
+            addAttr -ln "offsetTranslate"       -nn "Offset Translate"      -at double3                          $Ctrl;
+            addAttr -ln "offsetTranslateX"      -nn "Offset Translate X"    -at double      -p offsetTranslate   $Ctrl;
+            addAttr -ln "offsetTranslateY"      -nn "Offset Translate Y"    -at double      -p offsetTranslate   $Ctrl;
+            addAttr -ln "offsetTranslateZ"      -nn "Offset Translate Z"    -at double      -p offsetTranslate   $Ctrl;
+            addAttr -ln "offsetRotate"          -nn "Offset Rotate"         -at double3                          $Ctrl;
+            addAttr -ln "offsetRotateX"         -nn "Offset Rotate X"       -at double      -p offsetRotate      $Ctrl;
+            addAttr -ln "offsetRotateY"         -nn "Offset Rotate Y"       -at double      -p offsetRotate      $Ctrl;
+            addAttr -ln "offsetRotateZ"         -nn "Offset Rotate Z"       -at double      -p offsetRotate      $Ctrl;
+
+        addAttr -ln "Display"     -nn "----- Display" -at "enum" -en "----- : :"  $Ctrl; setAttr -e -channelBox true ($Ctrl+".Display");
+            //addAttr -ln "displayCtrler" -nn "Display Ctrler" -at bool  -keyable 1 $Ctrl;
+            addAttr -ln "cameraScale"   -nn "Camera Scale" -at double -dv 1 -keyable true $Ctrl;
+            addAttr -ln "displayCtrler" -nn "Display Ctrler" -at "enum" -en "off:on:" -dv 1 -keyable 1 $Ctrl;
+
+    // 노드 연결
+        connectAttr ($Ctrl+".cameraScale") ($camera+".sx");
+        connectAttr ($Ctrl+".cameraScale") ($camera+".sy");
+        connectAttr ($Ctrl+".cameraScale") ($camera+".sz");
+        connectAttr ($Ctrl+".focalLength") ($cameraShape+".focalLength");
+        //connectAttr ($Ctrl+".orthographic") ($cameraShape+".orthographic");
+        //connectAttr ($Ctrl+".tumbleTranslateZ")  ($cameraShape+".orthographicWidth");
+        //connectAttr ($Ctrl+".focalLength")  ($cameraShape+".orthographicWidth");
+        connectAttr ($Ctrl+".overscan") ($cameraShape+".overscan");
+        connectAttr ($Ctrl+".tumbleRotateX") ($rx+".rx");
+        connectAttr ($Ctrl+".tumbleRotateY") ($ry+".ry");
+        connectAttr ($Ctrl+".tumbleRotateZ") ($rz+".rz");
+        connectAttr ($Ctrl+".tumbleTranslateZ") ($tz+".tz");
+        connectAttr ($Ctrl+".offsetTranslateX") ($offsetTx+".tx");
+        connectAttr ($Ctrl+".offsetTranslateY") ($offsetTy+".ty");
+        connectAttr ($Ctrl+".offsetTranslateZ") ($offsetTz+".tz");
+        //connectAttr ($Ctrl+".offsetTranslate") ($offset+".t");
+        connectAttr ($Ctrl+".offsetRotate") ($offset+".r");
+        connectAttr ($Ctrl+".displayCtrler") ($dispGrp+".v");
+
+    // 필요없는 어트리뷰트 잠금
+        setAttr -lock true -keyable false -channelBox false ($camera+"_ry.tx");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_ry.ty");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_ry.tz");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_ry.rx");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_ry.rz");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_ry.sx");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_ry.sy");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_ry.sz");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_ry.v");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_rx.tx");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_rx.ty");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_rx.tz");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_rx.ry");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_rx.rz");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_rx.sx");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_rx.sy");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_rx.sz");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_rx.v");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_rz.tx");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_rz.ty");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_rz.tz");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_rz.rx");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_rz.ry");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_rz.sx");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_rz.sy");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_rz.sz");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_rz.v");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_tz.tx");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_tz.ty");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_tz.rx");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_tz.ry");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_tz.rz");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_tz.sx");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_tz.sy");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_tz.sz");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_tz.v");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_offsetTx.ty");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_offsetTx.tz");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_offsetTx.rx");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_offsetTx.ry");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_offsetTx.rz");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_offsetTx.sx");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_offsetTx.sy");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_offsetTx.sz");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_offsetTx.v");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_offsetTy.tx");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_offsetTy.tz");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_offsetTy.rx");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_offsetTy.ry");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_offsetTy.rz");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_offsetTy.sx");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_offsetTy.sy");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_offsetTy.sz");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_offsetTy.v");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_offsetTz.tx");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_offsetTz.ty");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_offsetTz.rx");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_offsetTz.ry");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_offsetTz.rz");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_offsetTz.sx");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_offsetTz.sy");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_offsetTz.sz");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_offsetTz.v");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_offset.sx");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_offset.sy");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_offset.sz");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_offset.v");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_Ctrl.sx");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_Ctrl.sy");
+        setAttr -lock true -keyable false -channelBox false ($camera+"_Ctrl.sz");
+
+        setAttr -lock false -keyable true -channelBox false ($cameraShape+".orthographic");
+        setAttr -lock false -keyable true -channelBox false ($cameraShape+".orthographicWidth");
+
+    // 카메라 컨스트레인
+        string $const[] = `parentConstraint $constraint $camera`;
+
+        setAttr -lock true -keyable false -channelBox false ($const[0]+".nds");
+        setAttr -lock true -keyable false -channelBox false ($const[0]+".int");
+        setAttr -lock true -keyable false -channelBox false ($const[0]+".w0");
+
+        parent $const $Ctrl;
+
+    // 메세지 타입의 여러개 어트리뷰트 생성
+        string $attr = "camera";
+        string $list[] =    {$camera, $Ctrl };
+        string $members[] = {$camera, $Ctrl };
+
+        for ($member in $members) {
+            if (`attributeExists $attr $member`) deleteAttr -at $attr $member;
+            addAttr -ln $attr -multi -attributeType "message" -indexMatters false $member;
+        }
+
+        for ($member in $members) {
+            for ($i=0; $i<size($list); $i++) {
+                connectAttr -f ($list[$i] + ".message") ($member + "."+$attr+"[" + $i + "]");
+            }
+        }
+
+    select -r $Ctrl;
+    return $Ctrl;
+}
+
+global proc addCamAttr(string $camera, string $attr) {
+    string $listRelatives[] = `listRelatives -s $camera`;
+    string $cameraShape = $listRelatives[0];
+
+    string $Ctrl = $camera+"_Ctrl";
+    if (!`objExists $Ctrl`) $Ctrl = createCameraCtrler($camera);
+
+    switch ($attr) {
+        case "frameRange" :
+            float $min = `playbackOptions -q -min`;
+            float $max = `playbackOptions -q -max`;
+
+            if (!`attributeExists "frameRange" $camera`) addAttr -ln "frameRange"    -nn "Frame Range (frame)"   -at double2                                      $camera;
+            if (!`attributeExists "startFrame" $camera`) addAttr -ln "startFrame"    -nn "Start Frame"           -at double  -p frameRange -dv $min -keyable true $camera;
+            if (!`attributeExists "endFrame"   $camera`) addAttr -ln "endFrame"      -nn "End Frame"             -at double  -p frameRange -dv $max -keyable true $camera;
+
+            setAttr ($Ctrl+".startFrame") -keyable true;
+            setAttr ($Ctrl+".endFrame")   -keyable true;
+
+            setAttr ($Ctrl+".startFrame") (`getAttr ($camera+".startFrame")`);
+            setAttr ($Ctrl+".endFrame")   (`getAttr ($camera+".endFrame")  `);
+
+            connectAttr ($Ctrl+".frameRange") ($camera+".frameRange");
+
+            break;
+
+        case "tumble" :
+            setAttr -e -channelBox true ($Ctrl+".Tumble");
+            setAttr ($Ctrl+".tumbleTranslateZ") -keyable true;
+            setAttr ($Ctrl+".tumbleRotateX") -keyable true;
+            setAttr ($Ctrl+".tumbleRotateY") -keyable true;
+            setAttr ($Ctrl+".tumbleRotateZ") -keyable true;
+
+            setAttr -e -channelBox true ($Ctrl+".Offset");
+            setAttr ($Ctrl+".offsetTranslateX") -keyable true;
+            setAttr ($Ctrl+".offsetTranslateY") -keyable true;
+            setAttr ($Ctrl+".offsetTranslateZ") -keyable true;
+            setAttr ($Ctrl+".offsetRotateX") -keyable true;
+            setAttr ($Ctrl+".offsetRotateY") -keyable true;
+            setAttr ($Ctrl+".offsetRotateZ") -keyable true;
+
+            setAttr ($Ctrl+".tumbleTranslateZ") 24;
+            setAttr ($Ctrl+".tumbleRotateX") -30;
+            setAttr ($Ctrl+".tumbleRotateY") 45;
+
+            break;
+
+        case "shake" :
+            string $shakeTransform = $camera+"_Shake";
+
+            setAttr -e -channelBox true ($Ctrl+".Shake");
+            setAttr ($Ctrl+".time")            -keyable false;
+            setAttr ($Ctrl+".timeOffset")      -keyable false;
+            setAttr ($Ctrl+".shakeAmplitude1") -keyable true;
+            setAttr ($Ctrl+".shakeFrequency1") -keyable true;
+            setAttr ($Ctrl+".shakeAmplitude2") -keyable true;
+            setAttr ($Ctrl+".shakeFrequency2") -keyable true;
+
+            setAttr ($Ctrl+".shakeTranslateX") -keyable true;
+            setAttr ($Ctrl+".shakeTranslateY") -keyable true;
+            setAttr ($Ctrl+".shakeTranslateZ") -keyable true;
+            setAttr ($Ctrl+".shakeRotateX") -keyable true;
+            setAttr ($Ctrl+".shakeRotateY") -keyable true;
+            setAttr ($Ctrl+".shakeRotateZ") -keyable true;
+
+            setAttr -e -channelBox true ($Ctrl+".Offset");
+            setAttr ($Ctrl+".offsetTranslateX") -keyable true;
+            setAttr ($Ctrl+".offsetTranslateY") -keyable true;
+            setAttr ($Ctrl+".offsetTranslateZ") -keyable true;
+            setAttr ($Ctrl+".offsetRotateX") -keyable true;
+            setAttr ($Ctrl+".offsetRotateY") -keyable true;
+            setAttr ($Ctrl+".offsetRotateZ") -keyable true;
+
+            // Default Value
+            setAttr ($Ctrl+".timeOffset")      3;
+            setAttr ($Ctrl+".shakeAmplitude1") 3;
+            setAttr ($Ctrl+".shakeFrequency1") 0.8;
+            setAttr ($Ctrl+".shakeAmplitude2") 0;
+            setAttr ($Ctrl+".shakeFrequency2") 10;
+
+            setAttr ($Ctrl+".shakeTranslateX") 0.2;
+            setAttr ($Ctrl+".shakeTranslateY") 0.2;
+            setAttr ($Ctrl+".shakeTranslateZ") 0;
+            setAttr ($Ctrl+".shakeRotateX") 1;
+            setAttr ($Ctrl+".shakeRotateY") 1;
+            setAttr ($Ctrl+".shakeRotateZ") 0;
+
+            string $exp;
+            $exp += ""+$Ctrl+".time = time;\n";
+            $exp += "\n";
+            $exp += "float $time   = "+$Ctrl+".time;\n";
+            $exp += "float $offset = "+$Ctrl+".timeOffset;\n";
+            $exp += "float $ampl1  = "+$Ctrl+".shakeAmplitude1;\n";
+            $exp += "float $freq1  = "+$Ctrl+".shakeFrequency1;\n";
+            $exp += "float $ampl2  = "+$Ctrl+".shakeAmplitude2;\n";
+            $exp += "float $freq2  = "+$Ctrl+".shakeFrequency2;\n";
+            $exp += "float $shakeTrX = "+$Ctrl+".shakeTranslateX;\n";
+            $exp += "float $shakeTrY = "+$Ctrl+".shakeTranslateY;\n";
+            $exp += "float $shakeTrZ = "+$Ctrl+".shakeTranslateZ;\n";
+            $exp += "float $shakeRtX = "+$Ctrl+".shakeRotateX;\n";
+            $exp += "float $shakeRtY = "+$Ctrl+".shakeRotateY;\n";
+            $exp += "float $shakeRtZ = "+$Ctrl+".shakeRotateZ;\n";
+            $exp += "\n";
+            $exp += "float $noise1X = "+$Ctrl+".noise1X = noise( ($time + $offset * 1) * $freq1 ) * $ampl1;\n";
+            $exp += "float $noise1Y = "+$Ctrl+".noise1Y = noise( ($time + $offset * 2) * $freq1 ) * $ampl1;\n";
+            $exp += "float $noise1Z = "+$Ctrl+".noise1Z = noise( ($time + $offset * 3) * $freq1 ) * $ampl1;\n";
+            $exp += "float $noise2X = "+$Ctrl+".noise2X = noise( ($time + $offset * 1) * $freq2 ) * $ampl2;\n";
+            $exp += "float $noise2Y = "+$Ctrl+".noise2Y = noise( ($time + $offset * 2) * $freq2 ) * $ampl2;\n";
+            $exp += "float $noise2Z = "+$Ctrl+".noise2Z = noise( ($time + $offset * 3) * $freq2 ) * $ampl2;\n";
+            $exp += "\n";
+            $exp += ""+$shakeTransform+".tx = ($noise1X + $noise2X) * $shakeTrX ;\n";
+            $exp += ""+$shakeTransform+".ty = ($noise1Y + $noise2Y) * $shakeTrY ;\n";
+            $exp += ""+$shakeTransform+".tz = ($noise1Z + $noise2Z) * $shakeTrZ ;\n";
+            $exp += ""+$shakeTransform+".rx = ($noise1X + $noise2X) * $shakeRtX ;\n";
+            $exp += ""+$shakeTransform+".ry = ($noise1Y + $noise2Y) * $shakeRtY ;\n";
+            $exp += ""+$shakeTransform+".rz = ($noise1Z + $noise2Z) * $shakeRtZ ;\n";
+
+            expression -n ($camera+"_Expression") -s $exp -o $Ctrl -ae 1 -uc all ;
+
+            break;
+
+        default :
+            break;
+    }
+}
+
+global proc matchFilmBackToResolution(string $sel[]) {
+    float $width =  `getAttr "defaultResolution.width"`;
+    float $height = `getAttr "defaultResolution.height"`;
+    float $pixelAspect =  `getAttr "defaultResolution.pixelAspect"`;
+
+    for ($i=0;$i<size($sel);$i++) {
+        string $camera = $sel[$i];
+        string $cameraShape;
+
+        string $listRelatives[] = `listRelatives -s $camera`;
+        $cameraShape = $listRelatives[0];
+
+        setAttr ($cameraShape+".horizontalFilmAperture") ($width/$height) ;
+        setAttr ($cameraShape+".verticalFilmAperture") 1 ;
+    }
+}
+
+global proc setPlaybackRange_ofCamera(string $camera) {
+    if (!`attributeExists "startFrame" $camera`)
+        return;
+    float $startFrame = `getAttr ($camera+".startFrame")`;
+    float $endFrame = `getAttr ($camera+".endFrame")`;
+    playbackOptions -min $startFrame -max $endFrame ;
+}
+
+global proc setDefault(string $camera, string $preset) {
+    string $Ctrl = $camera+"_Ctrl";
+    if (!`objExists $Ctrl`) $Ctrl = createCameraCtrler($camera);
+
+    string $listRelatives[] = `listRelatives -s $camera`;
+    string $cameraShape = $listRelatives[0];
+
+    if ( $preset=="bigScene" ) {
+        setAttr ($Ctrl+".cameraScale") 10;
+        setAttr ($cameraShape+".nearClipPlane") 1;
+        setAttr ($cameraShape+".farClipPlane") 100000;
+    }
+
+    setAttr ($cameraShape+".displayResolution") 1;
+}
+
+//---------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
+// Asset
+//---------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
+global proc makeAsset(string $camera, string $Ctrl) {
+    if (!`objExists $camera` || !`objExists $Ctrl` ) return;
+    string $listRelatives[] = `listRelatives -s $camera`;
+    string $cameraShape = $listRelatives[0];
+
+    string $asset = `container
+        -type dagContainer
+        -ind "history"
+        -ind "channels"
+        -includeHierarchyBelow
+        -includeTransform
+        -force
+        -addNode {$Ctrl, $camera}`;
+
+    move 0 0 0 ($asset+".scalePivot") ($asset+".rotatePivot") ;
+
+    setAttr ($camera+"_Template_Grp.overrideDisplayType") 0;
+
+    publishAttrToAsset($asset,$Ctrl,{"Camera","focalLength","overscan","startFrame","endFrame"});
+    publishAttrToAsset($asset,$Ctrl,{"Tumble","tumbleTranslateZ","tumbleRotateX","tumbleRotateY","tumbleRotateZ"});
+    publishAttrToAsset($asset,$Ctrl,{"Shake","shakeAmplitude1","shakeFrequency1","shakeAmplitude2","shakeFrequency2","shakeTranslateX","shakeTranslateY","shakeTranslateZ","shakeRotateX","shakeRotateY","shakeRotateZ"});
+    publishAttrToAsset($asset,$Ctrl,{"Offset","offsetTranslateX","offsetTranslateY","offsetTranslateZ","offsetRotateX","offsetRotateY","offsetRotateZ"});
+    publishAttrToAsset($asset,$Ctrl,{"Display","cameraScale","displayCtrler"});
+
+    rename $Ctrl ($Ctrl+"_Root");
+    $asset = `rename $asset $Ctrl`;
+
+    containerPublish -publishNode "cameraShape" "" $asset;
+    containerPublish -bindNode "cameraShape" $cameraShape $asset;
+
+    setAttr ($asset+".blackBox") 1;
+    setAttr ($asset+".viewMode") 0;
+    setAttr -lock true -keyable false -channelBox false ($asset+".sx");
+    setAttr -lock true -keyable false -channelBox false ($asset+".sy");
+    setAttr -lock true -keyable false -channelBox false ($asset+".sz");
+
+    string $result = `whereIs ("createCameraCtrler")`;
+    string $dirname = dirname( $result );
+    setAttr -type "string" ($asset+".iconName") ($dirname+"/icon/Camera_20x20.png");
+}
+
+global proc publishAttrToAsset(string $asset, string $node, string $attr[]) {
+    for ($i=0;$i<size($attr);$i++) {
+        container -e -publishName $attr[$i] $asset;
+        container -e -bindAttr ($node+"."+$attr[$i]) $attr[$i] $asset;
+    }
+}
+
+//---------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
+// 시각화 함수
+//---------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
+global proc string[] KH_curve_DisplayConnect( string $obj[]) {
+	// 예외처리
+		if (size($obj) == 0) $obj = `ls -transforms -sl`;
+		if (size($obj) < 2) error "KH_curve_Connect : 선택된 오브젝트가 없습니다.";
+
+	// 타겟 오브젝트
+		string $pointA = $obj[0];
+		string $pointB = $obj[1];
+
+	// 라인생성
+		string $curve = `curve -d 1 -p 0 0 0 -p 0 0 0 -k 0 -k 1 `;
+		string $pointCurveConstraint1[] = `pointCurveConstraint -ch true ($curve+".ep[0]") `;
+		string $pointCurveConstraint2[] = `pointCurveConstraint -ch true ($curve+".ep[1]") `;
+
+	// pointCurveConstraint로 생성된 로케이터를 타겟 오브젝트에 붙임
+		pointConstraint $pointA $pointCurveConstraint1[0];
+		pointConstraint $pointB $pointCurveConstraint2[0];
+
+	// 로케이터 가림
+		string $locShape1[] = `listRelatives -s $pointCurveConstraint1[0]`;
+		string $locShape2[] = `listRelatives -s $pointCurveConstraint2[0]`;
+		setAttr ($locShape1[0]+".visibility") 0;
+		setAttr ($locShape2[0]+".visibility") 0;
+
+	// return
+		return {$curve, $pointCurveConstraint1[0],$pointCurveConstraint2[0]};
+}
+
+// 함수명을 넣으면 스크립트가 위치한 경로를 리턴함.
+global proc string whereIs( string $procedure )
+{
+    string $where = "";
+
+    if ( `exists $procedure` )
+    {
+        // Use the whatIs command to determine the location.
+        string $result = eval( "whatIs " + $procedure );
+
+        // Parse the human-readable form.
+        string $tokens[];
+        int $numTokens = `tokenize $result " " $tokens`;
+
+        // Make sure this is a MEL script and not an internal command.
+        if ( $tokens[0] == "Mel" )
+        {
+            // Concatenate path if it contains spaces.
+            for ( $i = 4; $i < $numTokens; $i++ )
+            {
+                $where = $where + $tokens[$i];
+
+                if ( $i < $numTokens )
+                {
+                    $where = $where + "";
+                }
+            }
+        }
+    }
+
+    return $where;
+}
+
+//---------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
+// 허드
+//---------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
+
+global proc string KH_sceneName()
+	{
+	string $sceneName = `file -q -sceneName -shortName`;
+	if ($sceneName =="") $sceneName = "untitled";
+	return $sceneName;
+}
+
+global proc setHud( int $enable ) {
+	string $HUD_name = "HUD_KH_SceneName";
+
+	if ($enable==1) {
+        if (`headsUpDisplay -exists $HUD_name`)
+            return;
+
+        headsUpDisplay -section		6
+						-block			0
+						-blockSize		"small"
+						-label			"Scene Name :"
+						-labelFontSize	"small"
+						-blockAlignment	"right"
+						-dataAlignment	"left"
+						-command		"KH_sceneName()"
+						-event			"SceneOpened"
+						-event			"SceneSegmentChanged"
+						-event			"workspaceChanged"
+
+						$HUD_name;
+    } else
+        if (`headsUpDisplay -exists $HUD_name`) headsUpDisplay -remove $HUD_name;
+}
+
+
+
+
+//---------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
+// UI
+//---------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
+global proc Alfred_createCamera_ui()
+{
+    string $window = "createCameraUI";
+    if (`window -exists $window`) deleteUI $window;
+
+    window $window;
+
+    string $sel[] = `ls -sl`;
+    string $camera = Alfred_selectCamera($sel[0]);
+
+    //if (`attributeExists "camera" $sel[0]`) {
+    if (`objExists $camera`) {
+        window -e -t ("Edit Camera : "+$camera) $window;
+        Alfred_renameCamera_moduleUI( $camera, $window );
+    } else {
+        window -e -t "Create Camera" $window;
+        Alfred_createCamera_moduleUI( $window);
+    }
+
+    showWindow $window;
+}
+//---------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
+// UI Module
+//---------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
+global proc Alfred_createCamera_moduleUI(string $window) {
+    // 전역변수 선언
+        global int $gCamera_Options[];
+        global string $gACUI_camName;
+
+    // Default 값 정의
+        global int $gAlfred_createCamera_init;
+        if (!$gAlfred_createCamera_init) {
+            $gACUI_camName = "camera1";
+            $gCamera_Options = {1,0,1,1,1,1};
+
+            $gAlfred_createCamera_init = 1;
+        }
+
+    // UI
+    columnLayout -adjustableColumn true;
+    // -----------------------------------------------------
+        textFieldGrp -cw 1 140  -cw 2 200
+            -label "Camera Name : "
+            -text $gACUI_camName
+            -cc "$gACUI_camName = \"#1\""
+            TFG_cameraName;
+
+        checkBoxGrp
+            -label "Options : " -cw 1 140 -cw 2 200
+            -vertical
+            -numberOfCheckBoxes 3
+            -labelArray3 "Match Filmback to Resolution" "Make Asset" "Big Scene"
+            -valueArray3 $gCamera_Options[0] $gCamera_Options[1] $gCamera_Options[2]
+            -cc1 "$gCamera_Options[0] = #1;"
+            -cc2 "$gCamera_Options[1] = #1;"
+            -cc3 "$gCamera_Options[2] = #1;"
+            CBG_cameraOptions;
+
+        checkBoxGrp
+            -label "Add Attributes : " -cw 1 140 -cw 2 200
+            -vertical
+            -numberOfCheckBoxes 3
+            -labelArray3 "Frame Range" "Tumble Rig" "Shake"
+            -valueArray3 $gCamera_Options[3] $gCamera_Options[4] $gCamera_Options[5]
+            -cc1 "$gCamera_Options[3] = #1;"
+            -cc2 "$gCamera_Options[4] = #1;"
+            -cc3 "$gCamera_Options[5] = #1;"
+            CBG_addAttrOptions;
+
+        rowColumnLayout -numberOfColumns 2 -cw 1 140 -cw 2 240;
+            text   -l " " -al "right";
+            button -l "Create Camera " -c ("UI_Btn_createCam(); deleteUI \""+$window+"\" ;");
+            setParent..; // end rowColumnLayout
+
+    // -----------------------------------------------------
+        setParent..; // end of ColumnLayout
+    setParent..; // end of frameLayout
+}
+
+global proc Alfred_renameCamera_moduleUI(string $camera, string $window) {
+    columnLayout -adjustableColumn true;
+
+        textFieldGrp -cw 1 180  -cw 2 150
+            -label "Camera Rename : "
+            -text $camera
+            TFG_cameraName;
+
+        rowColumnLayout -numberOfColumns 2 -cw 1 180 -cw 2 150;
+            text   -l " " -al "right";
+            button -l "Rename" -c ("searchReplaceNames \""+$camera+"\" `textFieldGrp -q -text TFG_cameraName` \"all\"; deleteUI \""+$window+"\" ;");
+            setParent..; // end rowColumnLayout
+
+        separator -h 8 -style "in";
+
+        rowColumnLayout -numberOfColumns 2 -cw 1 180 -cw 2 150;
+            text   -l "Match Filmback to Resolution : " -al "right";
+            button -l "Match " -c ("matchFilmBackToResolution({\""+$camera+"\"})");
+            setParent..; // end rowColumnLayout
+
+        rowColumnLayout -numberOfColumns 2 -cw 1 180 -cw 2 150;
+            text   -l "Set Playback Range of Camera : " -al "right";
+            button -l "Set Range " -c ("setPlaybackRange_ofCamera(\""+$camera+"\")");
+            setParent..; // end rowColumnLayout
+
+    // -----------------------------------------------------
+        setParent..; // end of ColumnLayout
+    setParent..; // end of frameLayout
+}
+
+//---------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
+// UI Command
+//---------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
+global proc string Alfred_selectCamera(string $node) {
+    if (!`objExists $node`) return "";
+
+    string $camera;
+
+    if (`nodeType $node` == "dagContainer") {
+        string $listRelatives[] = `listRelatives $node`;
+        string $listConnectinos[] = `listConnections ($listRelatives[1]+".camera[0]")`;
+        $camera = $listConnectinos[0];
+    } else {
+        if (!`attributeExists "camera" $node`) return "";
+        string $listConnectinos[] = `listConnections ($node+".camera[0]")`;
+        $camera = $listConnectinos[0];
+    }
+    return $camera;
+}
+
+global proc UI_Btn_createCam() {
+    global int $gCamera_Options[];
+    global string $gACUI_camName;
+
+    $gACUI_camName = `textFieldGrp -q -text TFG_cameraName`;
+    if (`objExists $gACUI_camName`) error("\nUI_Btn_createCam : 이미 같은이름의 카메라가 있습니다. 다른이름을 지정해주세요.");
+
+    string $camera[];
+    string $sel[] = `ls -sl -dag`;
+
+    if (size($sel)==0) {
+        //$camera = createCam();
+        $camera = `camera`;
+        //if (`objExists $gACUI_camName`) $gACUI_camName += "#";
+        $camera[0] = `rename $camera[0] $gACUI_camName`;
+    } else {
+        $camera = $sel;
+    }
+
+    if ($gCamera_Options[3]) addCamAttr($camera[0],"frameRange");
+    if ($gCamera_Options[4]) addCamAttr($camera[0],"tumble");
+    if ($gCamera_Options[5]) addCamAttr($camera[0],"shake");
+
+    if ($gCamera_Options[0]) matchFilmBackToResolution({$camera[0]});
+    if ($gCamera_Options[1]) makeAsset($camera[0],($camera[0]+"_Ctrl"));
+
+    // 기본값 조정
+    if ($gCamera_Options[2]) setDefault($camera[0],"bigScene");
+
+    // HUD세팅
+    setHud(1);
+}
+
+global proc UI_Btn_renameCam(string $camera) {
+    searchReplaceNames "camera2" "camA" "all";
+}
+
